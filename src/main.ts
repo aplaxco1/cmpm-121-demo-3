@@ -47,9 +47,9 @@ sensorButton.addEventListener("click", () => {
   });
 });
 
-let points = 0;
+let collectedCoins = 0;
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
-statusPanel.innerHTML = "No points yet...";
+statusPanel.innerHTML = "No coins yet...";
 
 function makePit(i: number, j: number) {
   const bounds = leaflet.latLngBounds([
@@ -64,20 +64,38 @@ function makePit(i: number, j: number) {
   ]);
 
   const pit = leaflet.rectangle(bounds) as leaflet.Layer;
+  let coins = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
 
   pit.bindPopup(() => {
-    let value = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
     const container = document.createElement("div");
     container.innerHTML = `
-                <div>There is a pit here at "${i},${j}". It has value <span id="value">${value}</span>.</div>
-                <button id="poke">poke</button>`;
-    const poke = container.querySelector<HTMLButtonElement>("#poke")!;
-    poke.addEventListener("click", () => {
-      value--;
-      container.querySelector<HTMLSpanElement>("#value")!.innerHTML =
-        value.toString();
-      points++;
-      statusPanel.innerHTML = `${points} points accumulated`;
+                <div>There is a pit here at "${i},${j}". It has <span id="coins">${coins}</span> coins.</div>
+                <button id="collect">collect</button><button id="deposit">deposit</button`;
+    const collectButton =
+      container.querySelector<HTMLButtonElement>("#collect")!;
+    collectButton.addEventListener("click", () => {
+      if (coins > 0) {
+        coins--;
+        container.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
+          coins.toString();
+        collectedCoins++;
+        statusPanel.innerHTML = `${collectedCoins} coins collected`;
+      } else {
+        alert("No coins to collect.");
+      }
+    });
+    const depositButton =
+      container.querySelector<HTMLButtonElement>("#deposit")!;
+    depositButton.addEventListener("click", () => {
+      if (collectedCoins > 0) {
+        coins++;
+        container.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
+          coins.toString();
+        collectedCoins--;
+        statusPanel.innerHTML = `${collectedCoins} coins collected`;
+      } else {
+        alert("No coins to deposit.");
+      }
     });
     return container;
   });
