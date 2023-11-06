@@ -23,8 +23,12 @@ export class Board {
   private getCanonicalCell(cell: Cell): Cell {
     const { i, j } = cell;
     const key = [i, j].toString();
-    this.knownCells.set(key, cell);
-    return this.knownCells.get(key)!;
+    let resultingCell = this.knownCells.get(key);
+    if (!resultingCell) {
+      this.knownCells.set(key, cell);
+      resultingCell = this.knownCells.get(key);
+    }
+    return resultingCell!;
   }
 
   getCellForPoint(point: leaflet.LatLng): Cell {

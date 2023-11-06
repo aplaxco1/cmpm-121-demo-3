@@ -49,30 +49,60 @@ sensorButton.addEventListener("click", () => {
   });
 });
 
-let collectedCoins = 0;
+let collectedCoins: Coin[] = [];
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
 statusPanel.innerHTML = "No coins yet...";
+
+interface Coin {
+  i: number;
+  j: number;
+  serial: number;
+}
+
+function coinToString(coin: Coin): string {
+  let coinString = coin.i + ":" + coin.j + "#" + coin.serial;
+  return coinString;
+}
+
+function coinToStringList(coins: Coin[]): string {
+  let coinStrings = "";
+  for (let coin of coins) {
+    coinStrings += coinToString(coin) + "<br>";
+  }
+  return coinStrings;
+}
 
 function makePit(i: number, j: number) {
   const bounds = mapBoard.getCellBounds({ i: i, j: j });
 
   const pit = leaflet.rectangle(bounds) as leaflet.Layer;
-  let coins = Math.floor(luck([i, j, "initialValue"].toString()) * 100);
+
+  // set up coins
+  let numCoins = Math.floor(luck([i, j, "initialValue"].toString()) * 5);
+  let coins: Coin[] = [];
+  for (let coin = 0; coin < numCoins; coin++) {
+    let currCoin: Coin = { i: i, j: j, serial: coin };
+    coins.push(currCoin);
+  }
+  let coinList: string = coinToStringList(coins);
 
   pit.bindPopup(() => {
     const container = document.createElement("div");
     container.innerHTML = `
-                <div>There is a pit here at "${i},${j}". It has <span id="coins">${coins}</span> coins.</div>
+                <div>There is a pit here at "${i},${j}". It has <span id="numCoins">${coins.length}</span> coins.<br>Current Coins: <br><span id="coinList">${coinList}</span></div>
                 <button id="collect">collect</button><button id="deposit">deposit</button`;
     const collectButton =
       container.querySelector<HTMLButtonElement>("#collect")!;
     collectButton.addEventListener("click", () => {
-      if (coins > 0) {
-        coins--;
-        container.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-          coins.toString();
-        collectedCoins++;
-        statusPanel.innerHTML = `${collectedCoins} coins collected`;
+      if (coins.length > 0) {
+        let collectedCoin = coins.pop();
+        container.querySelector<HTMLSpanElement>("#numCoins")!.innerHTML =
+          coins.length.toString();
+        coinList = coinToStringList(coins);
+        container.querySelector<HTMLSpanElement>("#coinList")!.innerHTML =
+          coinList;
+        collectedCoins.push(collectedCoin!);
+        statusPanel.innerHTML = `${collectedCoins.length} coins collected`;
       } else {
         alert("No coins to collect.");
       }
@@ -80,12 +110,15 @@ function makePit(i: number, j: number) {
     const depositButton =
       container.querySelector<HTMLButtonElement>("#deposit")!;
     depositButton.addEventListener("click", () => {
-      if (collectedCoins > 0) {
-        coins++;
-        container.querySelector<HTMLSpanElement>("#coins")!.innerHTML =
-          coins.toString();
-        collectedCoins--;
-        statusPanel.innerHTML = `${collectedCoins} coins collected`;
+      if (collectedCoins.length > 0) {
+        let depositedCoin = collectedCoins.pop();
+        coins.push(depositedCoin!);
+        container.querySelector<HTMLSpanElement>("#numCoins")!.innerHTML =
+          coins.length.toString();
+        coinList = coinToStringList(coins);
+        container.querySelector<HTMLSpanElement>("#coinList")!.innerHTML =
+          coinList;
+        statusPanel.innerHTML = `${collectedCoins.length} coins collected`;
       } else {
         alert("No coins to deposit.");
       }
