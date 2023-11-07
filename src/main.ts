@@ -7,9 +7,10 @@ import { Board } from "./board";
 
 const GAMEPLAY_ZOOM_LEVEL = 19;
 const NEIGHBORHOOD_SIZE = 8;
+const TILE_DEGREES = 1e-4;
 const PIT_SPAWN_PROBABILITY = 0.1;
 
-const MERRILL_CLASSROOM = leaflet.latLng({
+const INITIAL_LOCATION = leaflet.latLng({
   lat: 36.9995,
   lng: -122.0533,
 });
@@ -19,7 +20,7 @@ const mapBoard = new Board(1, NEIGHBORHOOD_SIZE);
 const mapContainer = document.querySelector<HTMLElement>("#map")!;
 
 const map = leaflet.map(mapContainer, {
-  center: MERRILL_CLASSROOM,
+  center: INITIAL_LOCATION,
   zoom: GAMEPLAY_ZOOM_LEVEL,
   minZoom: GAMEPLAY_ZOOM_LEVEL,
   maxZoom: GAMEPLAY_ZOOM_LEVEL,
@@ -35,7 +36,7 @@ leaflet
   })
   .addTo(map);
 
-const playerMarker = leaflet.marker(MERRILL_CLASSROOM);
+const playerMarker = leaflet.marker(INITIAL_LOCATION);
 playerMarker.bindTooltip("That's you!");
 playerMarker.addTo(map);
 
@@ -48,6 +49,42 @@ sensorButton.addEventListener("click", () => {
     map.setView(playerMarker.getLatLng());
   });
 });
+
+const northButton = document.querySelector("#north")!;
+northButton.addEventListener("click", () => {
+  movePlayer(0, TILE_DEGREES);
+});
+const southButton = document.querySelector("#south")!;
+southButton.addEventListener("click", () => {
+  movePlayer(0, -TILE_DEGREES);
+});
+const westButton = document.querySelector("#west")!;
+westButton.addEventListener("click", () => {
+  movePlayer(-TILE_DEGREES, 0);
+});
+const eastButton = document.querySelector("#east")!;
+eastButton.addEventListener("click", () => {
+  movePlayer(TILE_DEGREES, 0);
+});
+
+function movePlayer(i: number, j: number) {
+  let currPosition: leaflet.LatLng = playerMarker.getLatLng();
+  playerMarker.setLatLng(
+    leaflet.latLng(currPosition.lat + j, currPosition.lng + i)
+  );
+  map.setView(playerMarker.getLatLng());
+}
+
+function redrawPits() {
+  let currCells = mapBoard.getCellsNearPoint(INITIAL_LOCATION);
+  for (let cell of currCells) {
+    if (luck([cell.i, cell.j].toString()) < PIT_SPAWN_PROBABILITY) {
+      makePit(cell.i, cell.j);
+    }
+  }
+}
+
+redrawPits();
 
 let collectedCoins: Coin[] = [];
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
@@ -126,11 +163,4 @@ function makePit(i: number, j: number) {
     return container;
   });
   pit.addTo(map);
-}
-
-let currCells = mapBoard.getCellsNearPoint(MERRILL_CLASSROOM);
-for (let cell of currCells) {
-  if (luck([cell.i, cell.j].toString()) < PIT_SPAWN_PROBABILITY) {
-    makePit(cell.i, cell.j);
-  }
 }
