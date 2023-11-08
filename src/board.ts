@@ -32,8 +32,8 @@ export class Board {
   }
 
   getCellForPoint(point: leaflet.LatLng): Cell {
-    const i = point.lat * CELL_DEGREES;
-    const j = point.lng * CELL_DEGREES;
+    const i = Math.round(point.lat * CELL_DEGREES);
+    const j = Math.round(point.lng * CELL_DEGREES);
     return this.getCanonicalCell({ i, j });
   }
 
