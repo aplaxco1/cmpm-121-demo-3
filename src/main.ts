@@ -40,6 +40,8 @@ const playerMarker = leaflet.marker(INITIAL_LOCATION);
 playerMarker.bindTooltip("That's you!");
 playerMarker.addTo(map);
 
+const playerMovedEvent = new Event("player-moved");
+
 const sensorButton = document.querySelector("#sensor")!;
 sensorButton.addEventListener("click", () => {
   navigator.geolocation.watchPosition((position) => {
@@ -51,8 +53,6 @@ sensorButton.addEventListener("click", () => {
     redrawPits(playerMarker.getLatLng());
   });
 });
-
-const playerMovedEvent = new Event("player-moved");
 
 const northButton = document.querySelector("#north")!;
 northButton.addEventListener("click", () => {
@@ -108,15 +108,28 @@ function coinToString(coin: Coin): string {
 }
 
 let collectedCoins: Coin[] = [];
+let selectedCoins: Coin[] = [];
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
 statusPanel.innerHTML = `Inventory:<br><span id=coinList></span>`;
 
 function updatePlayerInventory() {
   statusPanel.querySelector<HTMLSpanElement>("#coinList")!.innerHTML = ``;
   for (let coin of collectedCoins) {
-    statusPanel.querySelector<HTMLSpanElement>(
-      "#coinList"
-    )!.innerHTML += `${coinToString(coin)}<br>`;
+    const coinCheckbox = document.createElement("input");
+    coinCheckbox.setAttribute("type", "checkbox");
+    coinCheckbox.addEventListener("click", () => {
+      if (coinCheckbox.checked == true) {
+        selectedCoins.push(coin);
+      } else {
+        selectedCoins.splice(selectedCoins.indexOf(coin), 1);
+      }
+    });
+    statusPanel
+      .querySelector<HTMLSpanElement>("#coinList")!
+      .append(coinCheckbox);
+    const coinText = document.createElement("span");
+    coinText.innerHTML = coinToString(coin) + `<br>`;
+    statusPanel.querySelector<HTMLSpanElement>("#coinList")!.append(coinText);
   }
 }
 updatePlayerInventory();
@@ -155,7 +168,6 @@ function makePit(i: number, j: number) {
   const bounds = mapBoard.getCellBounds({ i: i, j: j });
   const pit = leaflet.rectangle(bounds) as leaflet.Layer;
 
-  let numCoins: number;
   let coins: Coin[] = [];
 
   let geoCacheData = new Geocache(i, j);
@@ -163,10 +175,11 @@ function makePit(i: number, j: number) {
   if (existingData) {
     geoCacheData.fromMomento(existingData);
     coins = geoCacheData.coins;
-    numCoins = coins.length;
   } else {
     // set up new coins if geocahce did not already exist
-    numCoins = Math.floor(luck([i, j, "initialValue"].toString()) * 5);
+    const numCoins = Math.floor(
+      luck([i, j, "initialValue"].toString()) * 5 + 1
+    );
     for (let coin = 0; coin < numCoins; coin++) {
       let currCoin: Coin = { i: i, j: j, serial: coin };
       coins.push(currCoin);
@@ -178,7 +191,7 @@ function makePit(i: number, j: number) {
   pit.bindPopup(() => {
     const container = document.createElement("div");
     container.innerHTML = `
-                <div>There is a pit here at "${i},${j}". It has <span id="numCoins">${coins.length}</span> coins.<br>Inventory: <br><span id="coinList"></span></div>
+                <div>Geocache "${i},${j}"<br><br>Inventory: <br><span id="coinList"></span></div>
                 <button id="deposit">deposit</button`;
 
     function updateCoinInventory() {
@@ -190,9 +203,8 @@ function makePit(i: number, j: number) {
     updateCoinInventory();
 
     function addCoinButton(coin: Coin) {
-      const coinText = document.createElement("span");
+      const coinText = document.createElement("div");
       coinText.innerHTML = coinToString(coin);
-      container.querySelector<HTMLSpanElement>("#coinList")!.append(coinText);
       const collectButton = document.createElement("button");
       collectButton.innerHTML = "collect";
       collectButton.addEventListener("click", () => {
@@ -200,24 +212,30 @@ function makePit(i: number, j: number) {
         coins.splice(coins.indexOf(coin), 1);
         geoCacheData.coins = coins;
         geocacheMap.set([i, j].toString(), geoCacheData.toMomento());
-        updateCoinInventory();
+        //updateCoinInventory();
+        collectButton.hidden = true;
+        coinText.hidden = true;
         updatePlayerInventory();
       });
-      container
-        .querySelector<HTMLSpanElement>("#coinList")!
-        .append(collectButton);
+      coinText.append(collectButton);
+      container.querySelector<HTMLSpanElement>("#coinList")!.append(coinText);
     }
 
     const depositButton =
       container.querySelector<HTMLButtonElement>("#deposit")!;
     depositButton.addEventListener("click", () => {
-      if (collectedCoins.length > 0) {
-        let depositedCoin = collectedCoins.pop();
-        coins.push(depositedCoin!);
-        container.querySelector<HTMLSpanElement>("#numCoins")!.innerHTML =
-          coins.length.toString();
+      if (collectedCoins.length > 0 && selectedCoins.length > 0) {
+        for (let coin of selectedCoins) {
+          collectedCoins.splice(collectedCoins.indexOf(coin), 1);
+          coins.push(coin);
+        }
+        selectedCoins = [];
       } else {
-        alert("No coins to deposit.");
+        if (collectedCoins.length == 0) {
+          alert("No coins to deposit.");
+        } else if (selectedCoins.length == 0) {
+          alert("No coins selected.");
+        }
       }
       updateCoinInventory();
       updatePlayerInventory();
