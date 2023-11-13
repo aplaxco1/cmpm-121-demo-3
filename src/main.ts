@@ -15,7 +15,7 @@ const INITIAL_LOCATION = leaflet.latLng({
   lng: -122.0533,
 });
 
-const mapBoard = new Board(1, NEIGHBORHOOD_SIZE);
+let mapBoard = new Board(1, NEIGHBORHOOD_SIZE);
 
 const mapContainer = document.querySelector<HTMLElement>("#map")!;
 
@@ -41,6 +41,11 @@ playerMarker.bindTooltip("That's you!");
 playerMarker.addTo(map);
 
 const playerMovedEvent = new Event("player-moved");
+let locationsTraveled: leaflet.LatLng[] = [INITIAL_LOCATION];
+let travelLine: leaflet.Polyline = leaflet.polyline(locationsTraveled, {
+  color: "red",
+});
+travelLine.addTo(map);
 
 const sensorButton = document.querySelector("#sensor")!;
 sensorButton.addEventListener("click", () => {
@@ -49,34 +54,51 @@ sensorButton.addEventListener("click", () => {
       leaflet.latLng(position.coords.latitude, position.coords.longitude)
     );
     map.setView(playerMarker.getLatLng());
+    locationsTraveled.push(playerMarker.getLatLng());
     mapContainer.dispatchEvent(playerMovedEvent);
-    redrawPits(playerMarker.getLatLng());
+    redrawMap(playerMarker.getLatLng());
   });
+});
+
+const resetButton = document.querySelector("#reset")!;
+resetButton.addEventListener("click", () => {
+  mapBoard = new Board(1, NEIGHBORHOOD_SIZE);
+  collectedCoins = [];
+  selectedCoins = [];
+  updatePlayerInventory();
+  geocacheMap.clear();
+  locationsTraveled = [playerMarker.getLatLng()];
+  mapContainer.dispatchEvent(playerMovedEvent);
+  redrawMap(playerMarker.getLatLng());
 });
 
 const northButton = document.querySelector("#north")!;
 northButton.addEventListener("click", () => {
   movePlayer(0, TILE_DEGREES);
+  locationsTraveled.push(playerMarker.getLatLng());
   mapContainer.dispatchEvent(playerMovedEvent);
-  redrawPits(playerMarker.getLatLng());
+  redrawMap(playerMarker.getLatLng());
 });
 const southButton = document.querySelector("#south")!;
 southButton.addEventListener("click", () => {
   movePlayer(0, -TILE_DEGREES);
+  locationsTraveled.push(playerMarker.getLatLng());
   mapContainer.dispatchEvent(playerMovedEvent);
-  redrawPits(playerMarker.getLatLng());
+  redrawMap(playerMarker.getLatLng());
 });
 const westButton = document.querySelector("#west")!;
 westButton.addEventListener("click", () => {
   movePlayer(-TILE_DEGREES, 0);
+  locationsTraveled.push(playerMarker.getLatLng());
   mapContainer.dispatchEvent(playerMovedEvent);
-  redrawPits(playerMarker.getLatLng());
+  redrawMap(playerMarker.getLatLng());
 });
 const eastButton = document.querySelector("#east")!;
 eastButton.addEventListener("click", () => {
   movePlayer(TILE_DEGREES, 0);
+  locationsTraveled.push(playerMarker.getLatLng());
   mapContainer.dispatchEvent(playerMovedEvent);
-  redrawPits(playerMarker.getLatLng());
+  redrawMap(playerMarker.getLatLng());
 });
 
 function movePlayer(i: number, j: number) {
@@ -87,11 +109,14 @@ function movePlayer(i: number, j: number) {
   map.setView(playerMarker.getLatLng());
 }
 
-function redrawPits(location: leaflet.LatLng) {
+function redrawMap(location: leaflet.LatLng) {
+  travelLine.removeFrom(map);
+  travelLine = leaflet.polyline(locationsTraveled, { color: "red" });
+  travelLine.addTo(map);
   let currCells = mapBoard.getCellsNearPoint(location);
   for (let cell of currCells) {
     if (luck([cell.i, cell.j].toString()) < PIT_SPAWN_PROBABILITY) {
-      makePit(cell.i, cell.j);
+      makeGeocache(cell.i, cell.j);
     }
   }
 }
@@ -164,7 +189,7 @@ class Geocache implements Momento<string> {
   }
 }
 
-function makePit(i: number, j: number) {
+function makeGeocache(i: number, j: number) {
   const bounds = mapBoard.getCellBounds({ i: i, j: j });
   const pit = leaflet.rectangle(bounds) as leaflet.Layer;
 
@@ -177,9 +202,7 @@ function makePit(i: number, j: number) {
     coins = geoCacheData.coins;
   } else {
     // set up new coins if geocahce did not already exist
-    const numCoins = Math.floor(
-      luck([i, j, "initialValue"].toString()) * 5 + 1
-    );
+    const numCoins = Math.floor(luck([i, j, "initialValue"].toString()) * 5);
     for (let coin = 0; coin < numCoins; coin++) {
       let currCoin: Coin = { i: i, j: j, serial: coin };
       coins.push(currCoin);
@@ -253,4 +276,4 @@ function makePit(i: number, j: number) {
   });
 }
 
-redrawPits(INITIAL_LOCATION);
+redrawMap(INITIAL_LOCATION);
