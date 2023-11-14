@@ -50,13 +50,19 @@ travelLine.addTo(map);
 const sensorButton = document.querySelector("#sensor")!;
 sensorButton.addEventListener("click", () => {
   navigator.geolocation.watchPosition((position) => {
-    playerMarker.setLatLng(
-      leaflet.latLng(position.coords.latitude, position.coords.longitude)
-    );
-    map.setView(playerMarker.getLatLng());
-    locationsTraveled.push(playerMarker.getLatLng());
-    mapContainer.dispatchEvent(playerMovedEvent);
-    redrawMap(playerMarker.getLatLng());
+    let prevLocation = playerMarker.getLatLng();
+    if (
+      prevLocation.lat != position.coords.latitude ||
+      prevLocation.lng != position.coords.longitude
+    ) {
+      playerMarker.setLatLng(
+        leaflet.latLng(position.coords.latitude, position.coords.longitude)
+      );
+      map.setView(playerMarker.getLatLng());
+      locationsTraveled.push(playerMarker.getLatLng());
+      mapContainer.dispatchEvent(playerMovedEvent);
+      redrawMap(playerMarker.getLatLng());
+    }
   });
 });
 
@@ -235,7 +241,6 @@ function makeGeocache(i: number, j: number) {
         coins.splice(coins.indexOf(coin), 1);
         geoCacheData.coins = coins;
         geocacheMap.set([i, j].toString(), geoCacheData.toMomento());
-        //updateCoinInventory();
         collectButton.hidden = true;
         coinText.hidden = true;
         updatePlayerInventory();
