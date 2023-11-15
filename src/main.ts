@@ -65,10 +65,7 @@ sensorButton.addEventListener("click", () => {
       playerMarker.setLatLng(
         leaflet.latLng(position.coords.latitude, position.coords.longitude)
       );
-      map.setView(playerMarker.getLatLng());
-      locationsTraveled.push(playerMarker.getLatLng());
-      mapContainer.dispatchEvent(playerMovedEvent);
-      redrawMap(playerMarker.getLatLng());
+      movePlayer(0, 0);
     }
   });
 });
