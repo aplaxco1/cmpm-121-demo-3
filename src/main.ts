@@ -36,16 +36,23 @@ leaflet
   })
   .addTo(map);
 
-const playerMarker = leaflet.marker(INITIAL_LOCATION);
-playerMarker.bindTooltip("That's you!");
-playerMarker.addTo(map);
-
 const playerMovedEvent = new Event("player-moved");
 let locationsTraveled: leaflet.LatLng[] = [INITIAL_LOCATION];
+if (localStorage.getItem("locationsTraveled")) {
+  locationsTraveled = JSON.parse(localStorage.getItem("locationsTraveled")!);
+}
+localStorage.setItem("locationsTraveled", JSON.stringify(locationsTraveled));
 let travelLine: leaflet.Polyline = leaflet.polyline(locationsTraveled, {
   color: "red",
 });
 travelLine.addTo(map);
+
+const playerMarker = leaflet.marker(
+  locationsTraveled[locationsTraveled.length - 1]
+);
+playerMarker.bindTooltip("That's you!");
+playerMarker.addTo(map);
+map.setView(playerMarker.getLatLng());
 
 const sensorButton = document.querySelector("#sensor")!;
 sensorButton.addEventListener("click", () => {
@@ -68,43 +75,36 @@ sensorButton.addEventListener("click", () => {
 
 const resetButton = document.querySelector("#reset")!;
 resetButton.addEventListener("click", () => {
-  mapBoard = new Board(1, NEIGHBORHOOD_SIZE);
-  collectedCoins = [];
-  selectedCoins = [];
-  updatePlayerInventory();
-  geocacheMap.clear();
-  locationsTraveled = [playerMarker.getLatLng()];
-  mapContainer.dispatchEvent(playerMovedEvent);
-  redrawMap(playerMarker.getLatLng());
+  let notify = prompt(
+    "Are you sure you want to reset your progress? (Y/N)",
+    "N"
+  );
+  if (notify == "Y" || notify == "y") {
+    mapBoard = new Board(1, NEIGHBORHOOD_SIZE);
+    collectedCoins = [];
+    selectedCoins = [];
+    updatePlayerInventory();
+    geocacheMap.clear();
+    movePlayer(0, 0);
+    localStorage.clear();
+  }
 });
 
 const northButton = document.querySelector("#north")!;
 northButton.addEventListener("click", () => {
   movePlayer(0, TILE_DEGREES);
-  locationsTraveled.push(playerMarker.getLatLng());
-  mapContainer.dispatchEvent(playerMovedEvent);
-  redrawMap(playerMarker.getLatLng());
 });
 const southButton = document.querySelector("#south")!;
 southButton.addEventListener("click", () => {
   movePlayer(0, -TILE_DEGREES);
-  locationsTraveled.push(playerMarker.getLatLng());
-  mapContainer.dispatchEvent(playerMovedEvent);
-  redrawMap(playerMarker.getLatLng());
 });
 const westButton = document.querySelector("#west")!;
 westButton.addEventListener("click", () => {
   movePlayer(-TILE_DEGREES, 0);
-  locationsTraveled.push(playerMarker.getLatLng());
-  mapContainer.dispatchEvent(playerMovedEvent);
-  redrawMap(playerMarker.getLatLng());
 });
 const eastButton = document.querySelector("#east")!;
 eastButton.addEventListener("click", () => {
   movePlayer(TILE_DEGREES, 0);
-  locationsTraveled.push(playerMarker.getLatLng());
-  mapContainer.dispatchEvent(playerMovedEvent);
-  redrawMap(playerMarker.getLatLng());
 });
 
 function movePlayer(i: number, j: number) {
@@ -113,6 +113,10 @@ function movePlayer(i: number, j: number) {
     leaflet.latLng(currPosition.lat + j, currPosition.lng + i)
   );
   map.setView(playerMarker.getLatLng());
+  locationsTraveled.push(playerMarker.getLatLng());
+  localStorage.setItem("locationsTraveled", JSON.stringify(locationsTraveled));
+  mapContainer.dispatchEvent(playerMovedEvent);
+  redrawMap(playerMarker.getLatLng());
 }
 
 function redrawMap(location: leaflet.LatLng) {
@@ -139,7 +143,12 @@ function coinToString(coin: Coin): string {
 }
 
 let collectedCoins: Coin[] = [];
+if (localStorage.getItem("collectedCoins")) {
+  collectedCoins = JSON.parse(localStorage.getItem("collectedCoins")!);
+}
+localStorage.setItem("collectedCoins", JSON.stringify(collectedCoins));
 let selectedCoins: Coin[] = [];
+
 const statusPanel = document.querySelector<HTMLDivElement>("#statusPanel")!;
 statusPanel.innerHTML = `Inventory:<br><span id=coinList></span>`;
 
@@ -166,6 +175,13 @@ function updatePlayerInventory() {
 updatePlayerInventory();
 
 let geocacheMap: Map<string, string> = new Map();
+if (localStorage.getItem("geocacheMap")) {
+  geocacheMap = new Map(JSON.parse(localStorage.getItem("geocacheMap")!));
+}
+localStorage.setItem(
+  "geocacheMap",
+  JSON.stringify(Array.from(geocacheMap.entries()))
+);
 
 interface Momento<T> {
   toMomento(): T;
@@ -197,7 +213,7 @@ class Geocache implements Momento<string> {
 
 function makeGeocache(i: number, j: number) {
   const bounds = mapBoard.getCellBounds({ i: i, j: j });
-  const pit = leaflet.rectangle(bounds) as leaflet.Layer;
+  const cache = leaflet.rectangle(bounds) as leaflet.Layer;
 
   let coins: Coin[] = [];
 
@@ -213,11 +229,33 @@ function makeGeocache(i: number, j: number) {
       let currCoin: Coin = { i: i, j: j, serial: coin };
       coins.push(currCoin);
     }
-    geoCacheData.coins = coins;
-    geocacheMap.set([i, j].toString(), geoCacheData.toMomento());
+    updateCoinData();
   }
 
-  pit.bindPopup(() => {
+  function updateCoinData() {
+    geoCacheData.coins = coins;
+    geocacheMap.set([i, j].toString(), geoCacheData.toMomento());
+    localStorage.setItem(
+      "geocacheMap",
+      JSON.stringify(Array.from(geocacheMap.entries()))
+    );
+    localStorage.setItem("collectedCoins", JSON.stringify(collectedCoins));
+  }
+
+  function depositCoins() {
+    for (let coin of selectedCoins) {
+      collectedCoins.splice(collectedCoins.indexOf(coin), 1);
+      coins.push(coin);
+    }
+    selectedCoins = [];
+  }
+
+  function collectCoin(coin: Coin) {
+    collectedCoins.push(coin);
+    coins.splice(coins.indexOf(coin), 1);
+  }
+
+  cache.bindPopup(() => {
     const container = document.createElement("div");
     container.innerHTML = `
                 <div>Geocache "${i},${j}"<br><br>Inventory: <br><span id="coinList"></span></div>
@@ -237,12 +275,9 @@ function makeGeocache(i: number, j: number) {
       const collectButton = document.createElement("button");
       collectButton.innerHTML = "collect";
       collectButton.addEventListener("click", () => {
-        collectedCoins.push(coin);
-        coins.splice(coins.indexOf(coin), 1);
-        geoCacheData.coins = coins;
-        geocacheMap.set([i, j].toString(), geoCacheData.toMomento());
-        collectButton.hidden = true;
         coinText.hidden = true;
+        collectCoin(coin);
+        updateCoinData();
         updatePlayerInventory();
       });
       coinText.append(collectButton);
@@ -253,11 +288,7 @@ function makeGeocache(i: number, j: number) {
       container.querySelector<HTMLButtonElement>("#deposit")!;
     depositButton.addEventListener("click", () => {
       if (collectedCoins.length > 0 && selectedCoins.length > 0) {
-        for (let coin of selectedCoins) {
-          collectedCoins.splice(collectedCoins.indexOf(coin), 1);
-          coins.push(coin);
-        }
-        selectedCoins = [];
+        depositCoins();
       } else {
         if (collectedCoins.length == 0) {
           alert("No coins to deposit.");
@@ -267,18 +298,17 @@ function makeGeocache(i: number, j: number) {
       }
       updateCoinInventory();
       updatePlayerInventory();
-      geoCacheData.coins = coins;
-      geocacheMap.set([i, j].toString(), geoCacheData.toMomento());
+      updateCoinData();
     });
 
     return container;
   });
 
-  pit.addTo(map);
+  cache.addTo(map);
 
   mapContainer.addEventListener("player-moved", () => {
-    pit.removeFrom(map);
+    cache.removeFrom(map);
   });
 }
 
-redrawMap(INITIAL_LOCATION);
+redrawMap(locationsTraveled[locationsTraveled.length - 1]);
