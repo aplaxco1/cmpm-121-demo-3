@@ -85,6 +85,7 @@ resetButton.addEventListener("click", () => {
     selectedCoins = [];
     updatePlayerInventory();
     geocacheMap.clear();
+    locationsTraveled = [];
     movePlayer(0, 0);
     localStorage.clear();
   }
